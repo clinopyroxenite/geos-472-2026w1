@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Vancouver bikeways: what kind of street gets what kind of bikeway?</title>
+  <link href="https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
+  <style>
+    :root {
+      --ink: #222;
+      --muted: #666;
+      --panel: rgba(255, 255, 255, 0.94);
+      --line: #d8d8d8;
+      --protected: #0a6e5c;
+      --painted: #d95f02;
+      --local: #3a7bd5;
+      --shared: #8e5ea2;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--ink); }
+    #map { position: absolute; inset: 0; }
+
+    .panel {
+      position: absolute; top: 12px; left: 12px; z-index: 2;
+      width: min(320px, calc(100vw - 24px));
+      background: var(--panel); border: 1px solid var(--line); border-radius: 6px;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+      padding: 12px 14px;
+    }
+    .panel h1 { font-size: 1.05rem; line-height: 1.25; margin: 0 0 6px; }
+    .panel p { font-size: 0.85rem; line-height: 1.4; margin: 0 0 10px; color: var(--muted); }
+    .panel details > summary { cursor: pointer; font-size: 0.85rem; font-weight: 600; margin-bottom: 8px; }
+
+    .legend { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+    .legend button {
+      display: flex; align-items: center; gap: 10px; width: 100%;
+      padding: 6px 8px; border: 1px solid transparent; border-radius: 4px;
+      background: transparent; font: inherit; font-size: 0.85rem; color: var(--ink);
+      text-align: left; cursor: pointer;
+    }
+    .legend button:hover { background: #f1f1f1; }
+    .legend button[aria-pressed="false"] { opacity: 0.4; }
+    .legend button:focus-visible { outline: 2px solid #1a1a1a; outline-offset: 1px; }
+    .swatch { flex: none; width: 28px; height: 0; border-top-style: solid; border-top-color: currentColor; }
+    .legend small { display: block; color: var(--muted); font-size: 0.75rem; }
+    .note { margin: 10px 0 0; font-size: 0.75rem; color: var(--muted); line-height: 1.4; }
+    .note .dash { display: inline-block; width: 22px; border-top: 2px dashed #8a8a8a; vertical-align: middle; margin-right: 6px; }
+
+    .maplibregl-popup-content { font: 0.85rem/1.4 system-ui, sans-serif; padding: 10px 12px; }
+    .maplibregl-popup-content strong { display: block; margin-bottom: 2px; }
+    .maplibregl-popup-content span { color: var(--muted); }
+
+    @media (max-width: 520px) {
+      .panel { padding: 10px 12px; }
+      .panel p { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+
+  <section class="panel" aria-label="Map title and legend">
+    <h1>Vancouver bikeways: which street gets which bikeway?</h1>
+    <p>Local street bikeways run through residential grids, painted lanes follow arterials, and protected facilities cluster off-street along the shoreline and parks.</p>
+    <details open>
+      <summary>Bikeway type (select to show or hide)</summary>
+      <ul class="legend" id="legend">
+        <li><button type="button" data-type="Protected Bike Lanes" aria-pressed="true" style="color: var(--protected)">
+          <span class="swatch" style="border-top-width: 4px"></span><span style="color: var(--ink)">Protected bike lanes<small>Physically separated, many off-street</small></span></button></li>
+        <li><button type="button" data-type="Painted Lanes" aria-pressed="true" style="color: var(--painted)">
+          <span class="swatch" style="border-top-width: 3px"></span><span style="color: var(--ink)">Painted lanes<small>Mostly on arterials</small></span></button></li>
+        <li><button type="button" data-type="Local Street" aria-pressed="true" style="color: var(--local)">
+          <span class="swatch" style="border-top-width: 2px"></span><span style="color: var(--ink)">Local street bikeways<small>Quiet residential streets</small></span></button></li>
+        <li><button type="button" data-type="Shared Lanes" aria-pressed="true" style="color: var(--shared)">
+          <span class="swatch" style="border-top-width: 2px"></span><span style="color: var(--ink)">Shared lanes<small>Cyclists share the lane</small></span></button></li>
+      </ul>
+      <p class="note"><span class="dash"></span>City boundary. The network ends here because the data cover only the City of Vancouver.</p>
+    </details>
+  </section>
+
+  <script>
+    const map = new maplibregl.Map({
+      container: 'map',
+      style: 'style.json',            // the file downloaded from Maputnik
+      center: [-123.12, 49.255],      // longitude, latitude
+      zoom: 11.2,
+      attributionControl: false
+    });
+
+    map.addControl(new maplibregl.NavigationControl(), 'top-right');
+    map.addControl(new maplibregl.AttributionControl({
+      compact: true,
+      customAttribution: [
+        'Bikeways: City of Vancouver Open Data (Open Government Licence – Vancouver)',
+        'Terrain: Mapzen terrain tiles on AWS'
+      ]
+    }));
+
+    // --- Legend: show or hide each bikeway type ---
+    const shown = new Set(['Protected Bike Lanes', 'Painted Lanes', 'Local Street', 'Shared Lanes']);
+    document.querySelectorAll('#legend button').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const type = btn.dataset.type;
+        if (shown.has(type)) { shown.delete(type); } else { shown.add(type); }
+        btn.setAttribute('aria-pressed', String(shown.has(type)));
+        map.setFilter('bikeways', ['in', ['get', 'bikeway_type'], ['literal', Array.from(shown)]]);
+      });
+    });
+
+    // --- Hover (or tap) popup with the facts behind each line ---
+    const popup = new maplibregl.Popup({ closeButton: false, closeOnClick: false, maxWidth: '260px' });
+
+    function featureAt(point) {
+      const pad = 5; // pixels, so thin lines are easy to hit
+      const box = [[point.x - pad, point.y - pad], [point.x + pad, point.y + pad]];
+      return map.queryRenderedFeatures(box, { layers: ['bikeways'] })[0];
+    }
+
+    function showPopup(e) {
+      const f = featureAt(e.point);
+      map.getCanvas().style.cursor = f ? 'pointer' : '';
+      if (!f) { popup.remove(); return; }
+      const p = f.properties;
+      const box = document.createElement('div');
+      const title = document.createElement('strong');
+      title.textContent = p.street_name || p.bike_route_name || 'Unnamed segment';
+      const type = document.createElement('div');
+      type.textContent = p.bikeway_type;
+      const meta = document.createElement('span');
+      const bits = [];
+      if (p.street_segment_type) bits.push('Road class: ' + p.street_segment_type);
+      if (p.year_of_construction) bits.push('Built ' + p.year_of_construction);
+      if (p.aaa_network === 'YES') bits.push('All ages and abilities network');
+      meta.textContent = bits.join('; ');
+      box.append(title, type, meta);
+      popup.setLngLat(e.lngLat).setDOMContent(box).addTo(map);
+    }
+
+    map.on('load', function () {
+      map.on('mousemove', showPopup);
+      map.on('click', showPopup);
+    });
+  </script>
+</body>
+</html>
