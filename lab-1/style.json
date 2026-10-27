@@ -16,7 +16,7 @@
     },
     "bikeways": {
       "type": "geojson",
-      "data": "https://clinopyroxenite.github.io/geos-472-2026w1/bikeways_clean.geojson"
+      "data": "https://clinopyroxenite.github.io/geos-472-2026w1/lab-1/bikeways_clean.geojson"
     },
     "terrain": {
       "type": "raster-dem",
