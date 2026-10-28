@@ -9,33 +9,69 @@
     <style>
         body { margin: 0; padding: 0; }
         #map { position: absolute; top: 0; bottom: 0; width: 100%; }
+        
+        /* Styling for the top info box */
         #info {
             position: absolute;
             top: 10px;
             left: 10px;
             background: white;
-            padding: 8px 12px;
-            border-radius: 4px;
+            padding: 10px 15px;
+            border-radius: 6px;
+            font-family: sans-serif;
+            font-size: 14px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            z-index: 1;
+        }
+
+        /* Styling for the legend */
+        #legend {
+            position: absolute;
+            bottom: 30px;
+            right: 10px;
+            background: white;
+            padding: 12px;
+            border-radius: 6px;
             font-family: sans-serif;
             font-size: 13px;
-            box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
             z-index: 1;
+        }
+        .legend-item { display: flex; align-items: center; margin-bottom: 6px; }
+        .legend-item:last-child { margin-bottom: 0; }
+        .legend-color {
+            width: 14px; height: 14px; border-radius: 50%;
+            margin-right: 8px; border: 1px solid #fff;
         }
     </style>
 </head>
 <body>
     <div id="info">Click a parking facility to see its rate and hours.</div>
+    
+    <!-- Legend HTML -->
+    <div id="legend">
+        <div class="legend-item">
+            <div class="legend-color" style="background-color: #0078ff;"></div>
+            <span>Accessible Parking Available</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background-color: #ff7f00;"></div>
+            <span>Standard Parking</span>
+        </div>
+    </div>
+
     <div id="map"></div>
 
     <script>
         // ============================================================
-        // 1. Create the map: style, center, and zoom
+        // 1. Create the map with a REAL base map style
         // ============================================================
         const map = new maplibregl.Map({
             container: 'map',
-            style: 'https://demotiles.maplibre.org/style.json',
-            center: [-123.246, 49.260], // Approximate center of UBC Vancouver campus
-            zoom: 14.5
+            // Using CARTO Voyager: A free, detailed, street-level map style
+            style: 'https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json', 
+            center: [-123.2465, 49.2605], // UBC Campus
+            zoom: 15 // Zoomed in a bit more to see buildings
         });
 
         // ============================================================
@@ -55,23 +91,25 @@
                 source: 'ubc-parking',
                 paint: {
                     // Expression: read the FAC_DISABLED attribute.
-                    // "1" means disabled-accessible spots are available; "0" means they are not.
+                    // "1" means accessible spots; "0" means standard.
                     'circle-color': [
                         'case',
                         ['==', ['get', 'FAC_DISABLED'], '1'],
-                        '#1f78b4', // Blue for facilities with accessible parking
-                        '#b2df8a'  // Light green for others
+                        '#0078ff', // Bright Blue
+                        '#ff7f00'  // Bright Orange
                     ],
 
-                    // Change circle radius based on zoom level
+                    // Make the circles larger and scale them with zoom
                     'circle-radius': [
                         'interpolate', ['linear'], ['zoom'],
-                        13, 3,
-                        18, 9
+                        13, 4,
+                        16, 10,
+                        19, 20
                     ],
 
-                    'circle-opacity': 0.8,
-                    'circle-stroke-width': 1.5,
+                    'circle-opacity': 0.9,
+                    // Add a thick white stroke to make them pop against the map
+                    'circle-stroke-width': 2,
                     'circle-stroke-color': '#ffffff'
                 }
             });
@@ -82,20 +120,19 @@
             map.on('click', 'parking-circles', (e) => {
                 const properties = e.features[0].properties;
 
-                // Pull the relevant attributes from the GeoJSON
                 const description = properties.FAC_DESCRIPTION || 'Parking Facility';
                 const rate = properties.FAC_RATE || 'Rate not available';
                 const hours = properties.FAC_HOURSDAY || 'Hours not available';
 
                 const htmlContent = `
-                    <div style="font-family: sans-serif; max-width: 250px;">
-                        <strong>${description}</strong><br><br>
-                        <strong>Rate:</strong> ${rate}<br>
-                        <strong>Day Hours:</strong> ${hours}
+                    <div style="font-family: sans-serif; max-width: 250px; line-height: 1.4;">
+                        <h3 style="margin: 0 0 8px 0; color: #333;">${description}</h3>
+                        <p style="margin: 0 0 4px 0;"><strong>Rate:</strong> ${rate}</p>
+                        <p style="margin: 0;"><strong>Day Hours:</strong> ${hours}</p>
                     </div>
                 `;
 
-                new maplibregl.Popup()
+                new maplibregl.Popup({ maxWidth: '300px' })
                     .setLngLat(e.lngLat)
                     .setHTML(htmlContent)
                     .addTo(map);
