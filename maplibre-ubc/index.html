@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>UBC Parking Facilities</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+    <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
+    <style>
+        body { margin: 0; padding: 0; }
+        #map { position: absolute; top: 0; bottom: 0; width: 100%; }
+        #info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: white;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-family: sans-serif;
+            font-size: 13px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+            z-index: 1;
+        }
+    </style>
+</head>
+<body>
+    <div id="info">Click a parking facility to see its rate and hours.</div>
+    <div id="map"></div>
+
+    <script>
+        // ============================================================
+        // 1. Create the map: style, center, and zoom
+        // ============================================================
+        const map = new maplibregl.Map({
+            container: 'map',
+            style: 'https://demotiles.maplibre.org/style.json',
+            center: [-123.246, 49.260], // Approximate center of UBC Vancouver campus
+            zoom: 14.5
+        });
+
+        // ============================================================
+        // 2. After the map loads, add the data source and layer
+        // ============================================================
+        map.on('load', () => {
+            // Add the GeoJSON data source for UBC parking
+            map.addSource('ubc-parking', {
+                type: 'geojson',
+                data: 'https://raw.githubusercontent.com/UBCGeodata/ubcv-parking/master/geojson/ubcv_parking_www.geojson'
+            });
+
+            // Add a circle layer and style it using an attribute expression
+            map.addLayer({
+                id: 'parking-circles',
+                type: 'circle',
+                source: 'ubc-parking',
+                paint: {
+                    // Expression: read the FAC_DISABLED attribute.
+                    // "1" means disabled-accessible spots are available; "0" means they are not.
+                    'circle-color': [
+                        'case',
+                        ['==', ['get', 'FAC_DISABLED'], '1'],
+                        '#1f78b4', // Blue for facilities with accessible parking
+                        '#b2df8a'  // Light green for others
+                    ],
+
+                    // Change circle radius based on zoom level
+                    'circle-radius': [
+                        'interpolate', ['linear'], ['zoom'],
+                        13, 3,
+                        18, 9
+                    ],
+
+                    'circle-opacity': 0.8,
+                    'circle-stroke-width': 1.5,
+                    'circle-stroke-color': '#ffffff'
+                }
+            });
+
+            // ============================================================
+            // 3. Add a click popup showing parking details
+            // ============================================================
+            map.on('click', 'parking-circles', (e) => {
+                const properties = e.features[0].properties;
+
+                // Pull the relevant attributes from the GeoJSON
+                const description = properties.FAC_DESCRIPTION || 'Parking Facility';
+                const rate = properties.FAC_RATE || 'Rate not available';
+                const hours = properties.FAC_HOURSDAY || 'Hours not available';
+
+                const htmlContent = `
+                    <div style="font-family: sans-serif; max-width: 250px;">
+                        <strong>${description}</strong><br><br>
+                        <strong>Rate:</strong> ${rate}<br>
+                        <strong>Day Hours:</strong> ${hours}
+                    </div>
+                `;
+
+                new maplibregl.Popup()
+                    .setLngLat(e.lngLat)
+                    .setHTML(htmlContent)
+                    .addTo(map);
+            });
+
+            // Change the cursor to a pointer when hovering over a facility
+            map.on('mouseenter', 'parking-circles', () => {
+                map.getCanvas().style.cursor = 'pointer';
+            });
+
+            map.on('mouseleave', 'parking-circles', () => {
+                map.getCanvas().style.cursor = '';
+            });
+        });
+    </script>
+</body>
+</html>
