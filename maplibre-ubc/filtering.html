@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>UBC Parking Highlighting</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+    <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
+    <style>
+        body { margin: 0; padding: 0; font-family: sans-serif; }
+        #map { position: absolute; top: 0; bottom: 0; width: 100%; }
+        
+        /* Styling for the controls at the top */
+        #controls {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: white;
+            padding: 10px 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+            z-index: 1;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        input { padding: 6px; border: 1px solid #ccc; border-radius: 4px; }
+        button { padding: 6px 12px; cursor: pointer; border: none; border-radius: 4px; background: #0056b3; color: white; font-weight: bold; }
+        button:hover { background: #003d82; }
+        #showAllButton { background: #555; }
+        #showAllButton:hover { background: #333; }
+
+        /* Styling for the dynamic legend */
+        #legend {
+            position: absolute;
+            bottom: 30px;
+            right: 10px;
+            background: white;
+            padding: 12px;
+            border-radius: 6px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            z-index: 1;
+            min-width: 180px;
+        }
+        #legend-title { font-weight: bold; margin-bottom: 8px; display: block; border-bottom: 1px solid #ddd; padding-bottom: 4px;}
+        .legend-item { display: flex; align-items: center; margin-bottom: 6px; font-size: 13px; }
+        .legend-color {
+            width: 14px; height: 14px; border-radius: 50%;
+            margin-right: 8px; border: 1px solid #fff; box-shadow: 0 0 2px #000;
+        }
+    </style>
+</head>
+<body>
+    <!-- UI Controls -->
+    <div id="controls">
+        <button id="showAllButton">Show All Parking</button>
+        <span>|</span>
+        <input type="text" id="highlightTextEntry" placeholder="e.g. Parkade">
+        <button id="highlightButton">Highlight</button>
+    </div>
+
+    <!-- Dynamic Legend -->
+    <div id="legend">
+        <span id="legend-title">All Parking</span>
+        <div class="legend-item">
+            <div id="legend-color-1" class="legend-color" style="background-color: #0078ff;"></div>
+            <span id="legend-text-1">Accessible Parking</span>
+        </div>
+        <div class="legend-item">
+            <div id="legend-color-2" class="legend-color" style="background-color: #ff7f00;"></div>
+            <span id="legend-text-2">Standard Parking</span>
+        </div>
+    </div>
+
+    <div id="map"></div>
+
+    <script>
+        // 1. Initialize Map
+        const map = new maplibregl.Map({
+            container: 'map',
+            style: 'https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json', 
+            center: [-123.2465, 49.2605], // UBC Campus
+            zoom: 15
+        });
+
+        // Define our default paint properties so we can easily revert to them
+        const defaultPaint = {
+            'circle-color': [
+                'case',
+                ['==', ['get', 'FAC_DISABLED'], '1'],
+                '#0078ff', // Accessible (Blue)
+                '#ff7f00'  // Standard (Orange)
+            ],
+            'circle-opacity': 0.9
+        };
+
+        map.on('load', () => {
+            // 2. Add Data Source
+            map.addSource('ubc-parking', {
+                type: 'geojson',
+                data: 'https://raw.githubusercontent.com/UBCGeodata/ubcv-parking/master/geojson/ubcv_parking_www.geojson'
+            });
+
+            // 3. Add Layer using default paint
+            map.addLayer({
+                id: 'parking-circles',
+                type: 'circle',
+                source: 'ubc-parking',
+                paint: {
+                    ...defaultPaint,
+                    'circle-radius': ['interpolate', ['linear'], ['zoom'], 13, 4, 16, 10, 19, 20],
+                    'circle-stroke-width': 2,
+                    'circle-stroke-color': '#ffffff'
+                }
+            });
+
+            // Add Popup functionality (from previous assignment)
+            map.on('click', 'parking-circles', (e) => {
+                const properties = e.features[0].properties;
+                const description = properties.FAC_DESCRIPTION || 'Parking Facility';
+                const rate = properties.FAC_RATE || 'Rate not available';
+                
+                new maplibregl.Popup({ maxWidth: '300px' })
+                    .setLngLat(e.lngLat)
+                    .setHTML(`<h3 style="margin:0 0 5px 0; font-size:14px;">${description}</h3><strong>Rate:</strong> ${rate}`)
+                    .addTo(map);
+            });
+            
+            map.on('mouseenter', 'parking-circles', () => { map.getCanvas().style.cursor = 'pointer'; });
+            map.on('mouseleave', 'parking-circles', () => { map.getCanvas().style.cursor = ''; });
+
+            // 4. BIND EVENT LISTENERS (After map loads)
+            document.getElementById('showAllButton').addEventListener('click', showAllParking);
+            document.getElementById('highlightButton').addEventListener('click', highlightParking);
+        });
+
+        // ============================================================
+        // FUNCTIONS FOR HIGHLIGHTING & STYLING
+        // ============================================================
+
+        function showAllParking() {
+            // Remove the filter
+            map.setFilter('parking-circles', null);
+            
+            // Reset paint properties to the default state
+            map.setPaintProperty('parking-circles', 'circle-color', defaultPaint['circle-color']);
+            map.setPaintProperty('parking-circles', 'circle-opacity', defaultPaint['circle-opacity']);
+            
+            // Update the Legend
+            document.getElementById('legend-title').innerText = "All Parking";
+            
+            document.getElementById('legend-color-1').style.backgroundColor = "#0078ff";
+            document.getElementById('legend-text-1').innerText = "Accessible Parking";
+            
+            document.getElementById('legend-color-2').style.backgroundColor = "#ff7f00";
+            document.getElementById('legend-text-2').innerText = "Standard Parking";
+        }
+
+        function highlightParking() {
+            const textEntry = document.getElementById('highlightTextEntry').value;
+            
+            // If box is empty, just show everything
+            if (textEntry === '') {
+                showAllParking();
+                return;
+            }
+
+            // Define the match expression for filtering and styling
+            const matches = ['in', textEntry, ['get', 'FAC_DESCRIPTION']];
+
+            // 1. Set the filter (we use null here because we WANT to keep all features on the map, 
+            // we just want to change their style. If we filtered them out, we couldn't make non-matches grey.)
+            map.setFilter('parking-circles', null);
+
+            // 2. Change Data Styling depending on if the expression is true
+            // If it matches, make it bright RED. If it doesn't match, make it GREY.
+            map.setPaintProperty('parking-circles', 'circle-color', [
+                'case',
+                matches,
+                '#ff0000', // Red highlight
+                '#cccccc'  // Grey background
+            ]);
+            
+            // If it matches, opacity 1. If it doesn't match, opacity 0.3.
+            map.setPaintProperty('parking-circles', 'circle-opacity', [
+                'case',
+                matches,
+                1.0, 
+                0.3  
+            ]);
+
+            // 3. Update the Dynamic Legend
+            document.getElementById('legend-title').innerText = `Results for "${textEntry}"`;
+            
+            document.getElementById('legend-color-1').style.backgroundColor = "#ff0000";
+            document.getElementById('legend-text-1').innerText = "Matches Search";
+            
+            document.getElementById('legend-color-2').style.backgroundColor = "#cccccc";
+            document.getElementById('legend-text-2').innerText = "No Match (Dimmed)";
+        }
+    </script>
+</body>
+</html>
