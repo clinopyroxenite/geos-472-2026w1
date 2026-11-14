@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Clinic Access Threshold Explorer</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@6.15.0/dist/maplibre-gl.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+
+  <aside id="panel">
+    <h1>Clinic Access Threshold Explorer</h1>
+
+    <p class="question">
+      Is &ldquo;access to care&rdquo; a property of the landscape, or a property of the
+      <em>threshold you choose</em>? Move the slider and watch the answer change.
+    </p>
+
+    <label for="threshold">
+      Maximum acceptable distance to nearest clinic:
+      <strong><span id="thVal">2.0</span> km</strong>
+    </label>
+    <input id="threshold" type="range" min="0.5" max="5" step="0.1" value="2">
+
+    <div id="legend">
+      <div><span class="sw served"></span> within threshold</div>
+      <div><span class="sw gap"></span> beyond threshold</div>
+      <div><span class="sw clinic"></span> clinic (click to remove)</div>
+    </div>
+
+    <div id="stats">
+      <div class="stat"><span id="servedPct">&ndash;</span><small>of population within reach</small></div>
+      <div class="stat"><span id="unservedPop">&ndash;</span><small>people beyond threshold</small></div>
+      <div class="stat"><span id="facCount">&ndash;</span><small>clinics in network</small></div>
+    </div>
+
+    <h2>How to explore</h2>
+    <ul>
+      <li><strong>Drag the slider</strong> to tighten or loosen the access standard.</li>
+      <li><strong>Click empty map</strong> to add a candidate clinic.</li>
+      <li><strong>Click a clinic</strong> to remove it.</li>
+      <li><strong>Hover a cell</strong> to read its population and nearest clinic.</li>
+    </ul>
+
+    <button id="reset">Reset clinic network</button>
+
+    <p class="note">
+      Population grid and clinic locations are <strong>synthetic</strong> demonstration
+      data generated in code (see README).
+    </p>
+  </aside>
+
+  <div id="map"></div>
+</div>
+
+<div id="tip"></div>
+
+<script src="https://unpkg.com/maplibre-gl@6.15.0/dist/maplibre-gl.js"></script>
+<script src="https://unpkg.com/@turf/turf@7.2.0/turf.min.js"></script>
+<script src="map.js"></script>
+</body>
+</html>
