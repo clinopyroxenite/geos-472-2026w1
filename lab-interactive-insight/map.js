@@ -22,8 +22,8 @@ const INITIAL_FACILITIES = [
 ];
 
 let facilities      = INITIAL_FACILITIES.map(f => ({ ...f }));
-let GRID            = [];    // built once on load
-let facilityCounter = 0;     // names clinics the user adds
+let GRID            = [];    
+let facilityCounter = 0;     
 
 function buildGrid() {
   const stepLon = CELL_KM / KM_PER_DEG_LON;
